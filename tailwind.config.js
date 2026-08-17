@@ -7,7 +7,9 @@ module.exports = {
   		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
+  			sm: 'calc(var(--radius) - 4px)',
+  			xl: 'calc(var(--radius) + 0.4rem)',
+  			'2xl': 'calc(var(--radius) + 0.9rem)'
   		},
   		colors: {
   			background: 'hsl(var(--background))',
@@ -34,7 +36,8 @@ module.exports = {
   			},
   			accent: {
   				DEFAULT: 'hsl(var(--accent))',
-  				foreground: 'hsl(var(--accent-foreground))'
+  				foreground: 'hsl(var(--accent-foreground))',
+  				soft: 'hsl(var(--accent-soft))'
   			},
   			destructive: {
   				DEFAULT: 'hsl(var(--destructive))',

@@ -1,0 +1,120 @@
+{
+  "name": "Meeting",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Display name of the meeting"
+    },
+    "day_of_week": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 6,
+      "description": "0=Sunday ... 6=Saturday"
+    },
+    "start_time": {
+      "type": "string",
+      "description": "HH:mm 24-hour"
+    },
+    "end_time": {
+      "type": "string",
+      "description": "HH:mm 24-hour"
+    },
+    "timezone": {
+      "type": "string",
+      "description": "IANA timezone, e.g. America/New_York"
+    },
+    "attendance_type": {
+      "type": "string",
+      "enum": [
+        "In-Person",
+        "Online",
+        "Hybrid"
+      ]
+    },
+    "meeting_formats": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "e.g. Discussion, Speaker, Basic Text"
+    },
+    "open_closed": {
+      "type": "string",
+      "enum": [
+        "Open",
+        "Closed"
+      ]
+    },
+    "venue_name": {
+      "type": "string"
+    },
+    "address": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string"
+    },
+    "postal_code": {
+      "type": "string"
+    },
+    "country": {
+      "type": "string"
+    },
+    "latitude": {
+      "type": "number"
+    },
+    "longitude": {
+      "type": "number"
+    },
+    "distance": {
+      "type": "number",
+      "description": "Miles from the user's location"
+    },
+    "virtual_url": {
+      "type": "string"
+    },
+    "virtual_platform": {
+      "type": "string",
+      "description": "Zoom, Google Meet, etc."
+    },
+    "phone": {
+      "type": "string"
+    },
+    "language": {
+      "type": "string"
+    },
+    "wheelchair_accessible": {
+      "type": "boolean"
+    },
+    "source": {
+      "type": "string",
+      "description": "e.g. local NA service body name"
+    },
+    "source_url": {
+      "type": "string"
+    },
+    "last_verified_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "verification_status": {
+      "type": "string",
+      "enum": [
+        "Official Source",
+        "Community Submitted",
+        "Community Verified"
+      ]
+    }
+  },
+  "required": [
+    "name",
+    "day_of_week",
+    "start_time",
+    "attendance_type",
+    "verification_status"
+  ]
+}
