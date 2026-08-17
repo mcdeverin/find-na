@@ -4,6 +4,7 @@ import { Map, List, SlidersHorizontal, MapPin, Search, RotateCw, Locate } from "
 import FilterDropdown from "@/components/FilterDropdown";
 import MultiFilterDropdown from "@/components/MultiFilterDropdown";
 import MeetingRow from "@/components/MeetingRow";
+import Logo from "@/components/Logo";
 import { useFilters, defaultFilters } from "@/lib/filtersContext";
 import { useMeetings } from "@/lib/MeetingsContext";
 import { DAY_NAMES, prepareMeetingOccurrences } from "@/lib/meetings";
@@ -47,9 +48,12 @@ export default function Meetings() {
       {/* Brand header */}
       <header className="sticky top-0 z-30 bg-background/90 px-5 pb-2 pt-6 backdrop-blur-lg">
         <div className="flex items-center justify-between">
-          <h1 className="font-heading text-[28px] font-semibold tracking-tight text-foreground">
-            Find <span className="text-accent">NA</span>
-          </h1>
+          <div className="flex items-center gap-2">
+            <Logo className="h-8 w-8 text-accent" />
+            <h1 className="font-heading text-[28px] font-semibold tracking-tight text-foreground">
+              Find <span className="text-accent">NA</span>
+            </h1>
+          </div>
           <button
             onClick={refresh}
             aria-label="Refresh meetings"

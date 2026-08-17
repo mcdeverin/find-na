@@ -9,6 +9,7 @@ import { FilterProvider } from "@/lib/filtersContext";
 import { MeetingsProvider } from "@/lib/MeetingsContext";
 
 import Layout from "@/components/Layout";
+import Splash from "@/components/Splash";
 import Meetings from "@/pages/Meetings";
 import Online from "@/pages/Online";
 import BasicText from "@/pages/BasicText";
@@ -25,6 +26,7 @@ import Legal from "@/pages/Legal";
 function App() {
   return (
     <AuthProvider>
+      <Splash />
       <QueryClientProvider client={queryClientInstance}>
         <Router>
           <ScrollToTop />
