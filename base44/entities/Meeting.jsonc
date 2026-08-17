@@ -97,6 +97,33 @@
     "source_url": {
       "type": "string"
     },
+    "submission_notes": {
+      "type": "string",
+      "description": "Additional notes provided with a community meeting submission"
+    },
+    "listed_locally": {
+      "type": "string",
+      "enum": [
+        "Yes",
+        "No",
+        "Not Sure"
+      ],
+      "description": "Whether the submitter says this meeting is listed by a local NA Area or Region"
+    },
+    "verification_contact": {
+      "type": "string",
+      "description": "Private contact information supplied only for verifying a community submission"
+    },
+    "virtual_meeting_id": {
+      "type": "string"
+    },
+    "virtual_password": {
+      "type": "string"
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
     "last_verified_at": {
       "type": "string",
       "format": "date-time"

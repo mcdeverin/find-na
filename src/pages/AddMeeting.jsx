@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, CheckCircle2, Video, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { base44 } from "@/api/base44Client";
 
 const STEPS = ["Meeting", "Location", "Details", "Online", "Verification"];
 
@@ -24,6 +25,8 @@ export default function AddMeeting() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [form, setForm] = useState({
     name: "", type: "In-Person", day: "Monday", start: "", end: "", timezone: "America/New_York",
     venue: "", address: "", city: "", state: "", postal: "", country: "US",
@@ -45,6 +48,61 @@ export default function AddMeeting() {
 
   const next = () => setStep((s) => Math.min(s + 1, steps.length - 1));
   const back = () => (step === 0 ? navigate(-1) : setStep((s) => s - 1));
+
+  const submitMeeting = async () => {
+    if (submitting) return;
+
+    setSubmitting(true);
+    setSubmitError("");
+
+    const dayMap = {
+      Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3,
+      Thursday: 4, Friday: 5, Saturday: 6,
+    };
+
+    try {
+      const response = await base44.functions.invoke("submitMeeting", {
+        name: form.name,
+        day_of_week: dayMap[form.day],
+        start_time: form.start,
+        end_time: form.end || undefined,
+        timezone: form.timezone,
+        attendance_type: form.type,
+        meeting_formats: form.format ? [form.format] : [],
+        open_closed: form.openClosed,
+        venue_name: form.venue || undefined,
+        address: form.address || undefined,
+        city: form.city || undefined,
+        state: form.state || undefined,
+        postal_code: form.postal || undefined,
+        country: form.country || undefined,
+        virtual_url: showOnline ? form.url || undefined : undefined,
+        virtual_platform: showOnline ? form.platform || undefined : undefined,
+        virtual_meeting_id: showOnline ? form.meetingId || undefined : undefined,
+        virtual_password: showOnline ? form.password || undefined : undefined,
+        phone: showOnline ? form.dialIn || undefined : undefined,
+        language: form.language,
+        wheelchair_accessible: form.wheelchair,
+        submission_notes: form.notes || undefined,
+        listed_locally: form.listed,
+        source_url: form.website || undefined,
+        verification_contact: form.contact || undefined,
+      });
+
+      if (response?.error) {
+        throw new Error(response.error);
+      }
+
+      setDone(true);
+    } catch (error) {
+      console.error("Meeting submission failed", error);
+      setSubmitError(
+        error?.message || "We couldn't submit this meeting right now. Please try again.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -81,12 +139,20 @@ export default function AddMeeting() {
             Continue <ChevronRight className="h-5 w-5" />
           </button>
         ) : (
-          <button
-            onClick={() => setDone(true)}
-            className="w-full rounded-2xl bg-accent py-3.5 text-[15px] font-semibold text-accent-foreground active:opacity-85"
-          >
-            Submit Meeting
-          </button>
+          <div>
+            {submitError && (
+              <p className="mb-3 text-center text-sm text-destructive" role="alert">
+                {submitError}
+              </p>
+            )}
+            <button
+              onClick={submitMeeting}
+              disabled={submitting}
+              className="w-full rounded-2xl bg-accent py-3.5 text-[15px] font-semibold text-accent-foreground disabled:opacity-50 active:opacity-85"
+            >
+              {submitting ? "Submitting…" : "Submit Meeting"}
+            </button>
+          </div>
         )}
       </div>
     </div>
