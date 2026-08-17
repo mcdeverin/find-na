@@ -11,6 +11,7 @@ export default function MeetingRow({ meeting, now = new Date(), occurrence = nul
   const isHybrid = meeting.attendance_type === "Hybrid";
 
   const locationLine = [meeting.city, meeting.state].filter(Boolean).join(", ");
+  const dateLabel = occ.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
   return (
     <button
@@ -25,6 +26,7 @@ export default function MeetingRow({ meeting, now = new Date(), occurrence = nul
         <span className="text-[17px] font-semibold leading-tight tracking-tight text-foreground">
           {formatTime(occ)}
         </span>
+        <span className="mt-0.5 text-[11px] font-medium text-muted-foreground">{dateLabel}</span>
         {isVirtual ? (
           <Video className="mt-1 h-4 w-4 text-accent" />
         ) : (

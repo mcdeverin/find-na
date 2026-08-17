@@ -13,9 +13,11 @@ export default function MultiFilterDropdown({
   options,
   selected,
   onChange,
+  fixedTrigger = false,
 }) {
-  const summary =
-    !selected || selected.length === 0
+  const summary = fixedTrigger
+    ? (triggerLabel || allLabel)
+    : !selected || selected.length === 0
       ? (triggerLabel || allLabel)
       : selected.length <= 2
       ? selected.join(", ")

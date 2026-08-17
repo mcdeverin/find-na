@@ -14,6 +14,7 @@ const DAY_OPTIONS = ["Today", "Tomorrow", "Any Day", ...DAY_NAMES];
 const TIME_OPTIONS = ["Any Time", "Morning", "Afternoon", "Evening", "Late Night"];
 const ATTEND_OPTIONS = ["In-Person", "Online", "Hybrid"];
 const DISTANCE_OPTIONS = [5, 10, 25, 50, "Any"];
+const SORT_OPTIONS = ["Soonest", "Closest"];
 
 export default function Meetings() {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ export default function Meetings() {
   const { meetings, status, error, location, refresh, useCurrentLocation, searchByLocation } =
     useMeetings();
   const [locText, setLocText] = useState("");
+  const [sort, setSort] = useState("Soonest");
   const now = new Date();
 
   // For the Today view this includes meetings that already started earlier
@@ -29,9 +31,22 @@ export default function Meetings() {
     () => prepareMeetingOccurrences(meetings, filters, now),
     [meetings, filters]
   );
-  const upcoming = occurrences.filter((o) => !o.isPast);
-  const earlier = occurrences.filter((o) => o.isPast);
-  const grouped = filters.day === "Today" && earlier.length > 0;
+  const sortedOccurrences = useMemo(() => {
+    if (sort === "Closest") {
+      return [...occurrences].sort((a, b) => {
+        const ad = a.meeting.distance;
+        const bd = b.meeting.distance;
+        if (ad == null && bd == null) return a.occ - b.occ;
+        if (ad == null) return 1;
+        if (bd == null) return -1;
+        return ad - bd || a.occ - b.occ;
+      });
+    }
+    return occurrences;
+  }, [occurrences, sort]);
+  const upcoming = sortedOccurrences.filter((o) => !o.isPast);
+  const earlier = sortedOccurrences.filter((o) => o.isPast);
+  const grouped = filters.day === "Today" && earlier.length > 0 && sort === "Soonest";
 
   const submitLocation = (e) => {
     e.preventDefault();
@@ -115,12 +130,19 @@ export default function Meetings() {
           options={ATTEND_OPTIONS}
           selected={filters.attendance}
           onChange={(arr) => setFilters({ ...filters, attendance: arr })}
+          fixedTrigger
         />
         <FilterDropdown
           label={filters.distance === "Any" ? "Any Distance" : `${filters.distance} mi`}
           options={{ list: DISTANCE_OPTIONS, default: 25 }}
           value={filters.distance}
           onChange={(v) => setFilters({ ...filters, distance: v })}
+        />
+        <FilterDropdown
+          label={sort}
+          options={{ list: SORT_OPTIONS, default: "Soonest" }}
+          value={sort}
+          onChange={setSort}
         />
         <button
           onClick={() => navigate("/filters")}
@@ -160,7 +182,7 @@ export default function Meetings() {
         )}
 
         {status === "success" && !grouped &&
-          occurrences.map((o) => (
+          sortedOccurrences.map((o) => (
             <MeetingRow key={o.meeting.id} meeting={o.meeting} occurrence={o.occ} isPast={o.isPast} />
           ))}
 
