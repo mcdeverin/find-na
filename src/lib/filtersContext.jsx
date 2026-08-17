@@ -3,11 +3,11 @@ import { createContext, useContext, useMemo, useState } from "react";
 const FilterContext = createContext(null);
 
 export const defaultFilters = {
-  day: "Today", // Today | Tomorrow | Any Day | Monday..Sunday
+  day: "Today", // Today | Tomorrow | Any Day | Sunday..Saturday
   timeOfDay: "Any Time", // Morning | Afternoon | Evening | Late Night | Any Time
-  attendance: "Any", // In-Person | Online | Hybrid | Any
+  attendance: ["In-Person", "Hybrid"], // venue types (multi-select); [] = Any
   openClosed: "Any", // Open | Closed | Any
-  formats: [], // Discussion, Speaker, ...
+  formats: [], // BMLT format codes
   wheelchairOnly: false,
   language: "Any", // English | Spanish | Other | Any
   distance: 25, // miles, or "Any"

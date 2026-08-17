@@ -1,27 +1,40 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Map, List, SlidersHorizontal, MapPin, Search } from "lucide-react";
+import { Map, List, SlidersHorizontal, MapPin, Search, RotateCw, Locate } from "lucide-react";
 import FilterDropdown from "@/components/FilterDropdown";
+import MultiFilterDropdown from "@/components/MultiFilterDropdown";
 import MeetingRow from "@/components/MeetingRow";
-import { useFilters } from "@/lib/filtersContext";
-import { mockMeetings, DAY_NAMES, sortByNextOccurrence } from "@/lib/meetings";
-import { applyFilters } from "@/lib/applyFilters";
+import { useFilters, defaultFilters } from "@/lib/filtersContext";
+import { useMeetings } from "@/lib/MeetingsContext";
+import { DAY_NAMES, prepareMeetings } from "@/lib/meetings";
 import { cn } from "@/lib/utils";
 
 const DAY_OPTIONS = ["Today", "Tomorrow", "Any Day", ...DAY_NAMES];
 const TIME_OPTIONS = ["Any Time", "Morning", "Afternoon", "Evening", "Late Night"];
-const ATTEND_OPTIONS = ["Any", "In-Person", "Online", "Hybrid"];
+const ATTEND_OPTIONS = ["In-Person", "Online", "Hybrid"];
 
 export default function Meetings() {
   const navigate = useNavigate();
   const { filters, setFilters } = useFilters();
-  const [view, setView] = useState("list"); // list | map
+  const { meetings, status, error, location, refresh, useCurrentLocation, searchByLocation } =
+    useMeetings();
+  const [locText, setLocText] = useState("");
   const now = new Date();
 
   const filtered = useMemo(
-    () => sortByNextOccurrence(applyFilters(mockMeetings, filters, now), now),
-    [filters]
+    () => prepareMeetings(meetings, filters, now),
+    [meetings, filters]
   );
+
+  const submitLocation = (e) => {
+    e.preventDefault();
+    if (locText.trim()) searchByLocation(locText.trim());
+  };
+
+  const expandTarget =
+    filters.distance < 50 ? 50 : filters.distance === 50 ? "Any" : null;
+
+  const showSkeleton = status === "locating" || status === "loading";
 
   return (
     <div>
@@ -31,42 +44,40 @@ export default function Meetings() {
           <h1 className="font-heading text-[28px] font-semibold tracking-tight text-foreground">
             Find <span className="text-accent">NA</span>
           </h1>
+          <button
+            onClick={refresh}
+            aria-label="Refresh meetings"
+            className="rounded-full p-1.5 text-muted-foreground active:bg-muted"
+          >
+            <RotateCw className={cn("h-5 w-5", showSkeleton && "animate-spin")} />
+          </button>
         </div>
 
-        {/* Search / location field */}
-        <button
-          onClick={() => document.getElementById("search-input")?.focus()}
-          className="mt-3 flex w-full items-center gap-2.5 rounded-2xl border border-border bg-secondary/60 px-3.5 py-3 text-left"
-        >
+        {/* Location search field */}
+        <form onSubmit={submitLocation} className="mt-3 flex w-full items-center gap-2.5 rounded-2xl border border-border bg-secondary/60 px-3.5 py-3">
           <MapPin className="h-5 w-5 shrink-0 text-accent" />
           <input
-            id="search-input"
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-            placeholder="Meetings near Current Location"
+            value={locText}
+            onChange={(e) => setLocText(e.target.value)}
+            placeholder={location ? location.label : "Enter city, state, or ZIP"}
             className="w-full bg-transparent text-[15px] text-foreground placeholder:text-muted-foreground focus:outline-none"
           />
-          <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-        </button>
+          <button type="submit" aria-label="Search location" className="shrink-0 text-muted-foreground">
+            <Search className="h-4 w-4" />
+          </button>
+        </form>
 
         {/* List / Map toggle */}
         <div className="mt-2.5 flex items-center justify-end">
           <div className="inline-flex rounded-full border border-border p-0.5">
             <button
-              onClick={() => setView("list")}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors",
-                view === "list" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
-              )}
+              className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-medium text-accent-foreground"
             >
               <List className="h-3.5 w-3.5" /> List
             </button>
             <button
               onClick={() => navigate("/map")}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors",
-                "text-muted-foreground"
-              )}
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-muted-foreground"
             >
               <Map className="h-3.5 w-3.5" /> Map
             </button>
@@ -88,18 +99,15 @@ export default function Meetings() {
           value={filters.timeOfDay}
           onChange={(v) => setFilters({ ...filters, timeOfDay: v })}
         />
-        <FilterDropdown
-          label={filters.attendance === "Any" ? "In-Person" : filters.attendance}
-          options={{ list: ATTEND_OPTIONS, default: "Any" }}
-          value={filters.attendance}
-          onChange={(v) => setFilters({ ...filters, attendance: v })}
+        <MultiFilterDropdown
+          allLabel="Attendance"
+          options={ATTEND_OPTIONS}
+          selected={filters.attendance}
+          onChange={(arr) => setFilters({ ...filters, attendance: arr })}
         />
         <button
           onClick={() => navigate("/filters")}
-          className={cn(
-            "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
-            "border-border bg-background text-foreground"
-          )}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-background px-3.5 py-1.5 text-sm font-medium text-foreground"
         >
           <SlidersHorizontal className="h-3.5 w-3.5" />
           Filters
@@ -108,22 +116,106 @@ export default function Meetings() {
 
       {/* Body */}
       <div className="border-t border-border">
-        {filtered.length === 0 ? (
-          <EmptyState />
-        ) : (
-          filtered.map((m) => <MeetingRow key={m.id} meeting={m} />)
+        {status === "denied" && (
+          <DeniedState onUseLocation={useCurrentLocation} />
         )}
+        {showSkeleton && <SkeletonList />}
+        {status === "error" && <ErrorState message={error} onRetry={refresh} />}
+        {status === "success" && filtered.length === 0 && (
+          <EmptyState
+            expandTarget={expandTarget}
+            onExpand={() => setFilters({ ...filters, distance: expandTarget })}
+            onClear={() => setFilters(defaultFilters)}
+          />
+        )}
+        {status === "success" &&
+          filtered.map((m) => <MeetingRow key={m.id} meeting={m} />)}
       </div>
     </div>
   );
 }
 
-function EmptyState() {
+function SkeletonList() {
+  return (
+    <div>
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className="flex items-stretch gap-3 border-b border-border px-5 py-3.5">
+          <div className="w-[68px] shrink-0 space-y-2">
+            <div className="h-4 w-12 animate-pulse rounded bg-muted" />
+            <div className="h-3 w-8 animate-pulse rounded bg-muted" />
+          </div>
+          <div className="flex-1 space-y-2">
+            <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
+            <div className="h-3 w-1/2 animate-pulse rounded bg-muted" />
+            <div className="h-3 w-1/3 animate-pulse rounded bg-muted" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DeniedState({ onUseLocation }) {
+  return (
+    <div className="flex flex-col items-center px-8 py-16 text-center">
+      <MapPin className="h-10 w-10 text-accent" />
+      <p className="mt-4 text-lg font-semibold text-foreground">Find meetings near you</p>
+      <p className="mt-1.5 text-sm text-muted-foreground">
+        Enter a city, state, or ZIP code in the search field above, or share your
+        current location.
+      </p>
+      <button
+        onClick={onUseLocation}
+        className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-accent px-5 py-3 text-[15px] font-semibold text-accent-foreground active:opacity-85"
+      >
+        <Locate className="h-5 w-5" /> Use Current Location
+      </button>
+    </div>
+  );
+}
+
+function ErrorState({ message, onRetry }) {
+  return (
+    <div className="flex flex-col items-center px-8 py-16 text-center">
+      <p className="text-base font-semibold text-foreground">
+        We couldn't load meetings right now.
+      </p>
+      <p className="mt-1.5 text-sm text-muted-foreground">
+        Check your connection and try again.
+      </p>
+      <button
+        onClick={onRetry}
+        className="mt-5 inline-flex items-center gap-2 rounded-2xl border border-border bg-background px-5 py-3 text-[15px] font-semibold text-foreground active:bg-muted"
+      >
+        <RotateCw className="h-4 w-4" /> Try Again
+      </button>
+    </div>
+  );
+}
+
+function EmptyState({ expandTarget, onExpand, onClear }) {
   return (
     <div className="flex flex-col items-center px-8 py-16 text-center">
       <MapPin className="h-10 w-10 text-muted-foreground/40" />
-      <p className="mt-3 text-sm font-medium text-foreground">No meetings match your filters</p>
-      <p className="mt-1 text-sm text-muted-foreground">Try widening the distance or day.</p>
+      <p className="mt-3 text-sm font-medium text-foreground">
+        No meetings found with these filters.
+      </p>
+      <div className="mt-4 flex flex-col gap-2.5">
+        {expandTarget && (
+          <button
+            onClick={onExpand}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-accent px-5 py-3 text-[15px] font-semibold text-accent-foreground active:opacity-85"
+          >
+            {expandTarget === "Any" ? "Expand search to any distance" : "Expand to 50 miles"}
+          </button>
+        )}
+        <button
+          onClick={onClear}
+          className="inline-flex items-center justify-center rounded-2xl border border-border bg-background px-5 py-3 text-[15px] font-semibold text-foreground active:bg-muted"
+        >
+          Clear Filters
+        </button>
+      </div>
     </div>
   );
 }

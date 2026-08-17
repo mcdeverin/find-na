@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, CheckCircle2 } from "lucide-react";
-import { getMeetingById } from "@/lib/meetings";
+import { useMeetings } from "@/lib/MeetingsContext";
+import { fetchMeetingByIds } from "@/lib/bmlt";
 import { cn } from "@/lib/utils";
 
 const REASONS = [
@@ -20,10 +21,20 @@ const inputCls =
 export default function SuggestUpdate() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const meeting = getMeetingById(id);
+  const { getMeetingById } = useMeetings();
+  const [meeting, setMeeting] = useState(() => getMeetingById(id));
   const [reason, setReason] = useState(null);
   const [details, setDetails] = useState("");
   const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    if (meeting) return;
+    let alive = true;
+    fetchMeetingByIds([id]).then((list) => {
+      if (alive && list && list.length) setMeeting(list[0]);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [id, meeting]);
 
   if (done) {
     return (

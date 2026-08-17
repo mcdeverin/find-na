@@ -6,6 +6,7 @@ import PageNotFound from "./lib/PageNotFound";
 import { AuthProvider } from "@/lib/AuthContext";
 import ScrollToTop from "./components/ScrollToTop";
 import { FilterProvider } from "@/lib/filtersContext";
+import { MeetingsProvider } from "@/lib/MeetingsContext";
 
 import Layout from "@/components/Layout";
 import Meetings from "@/pages/Meetings";
@@ -28,6 +29,7 @@ function App() {
         <Router>
           <ScrollToTop />
           <FilterProvider>
+            <MeetingsProvider>
             <div className="mx-auto w-full max-w-md">
             <Routes>
               {/* Tabbed screens (with bottom nav) */}
@@ -54,6 +56,7 @@ function App() {
               <Route path="*" element={<PageNotFound />} />
             </Routes>
             </div>
+            </MeetingsProvider>
           </FilterProvider>
         </Router>
         <Toaster />

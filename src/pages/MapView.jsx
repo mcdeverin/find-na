@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { List, Navigation, Video, X } from "lucide-react";
-import { mockMeetings, sortByNextOccurrence, nextOccurrence, formatTime, relativeDayLabel } from "@/lib/meetings";
-import { applyFilters } from "@/lib/applyFilters";
+import { useMeetings } from "@/lib/MeetingsContext";
 import { useFilters } from "@/lib/filtersContext";
+import { prepareMeetings, nextOccurrence, formatTime, relativeDayLabel } from "@/lib/meetings";
 
-// Generic location pin (NOT the NA logo).
+// Generic teal pin (NOT the NA logo).
 const pinIcon = L.divIcon({
   className: "",
   html: `<span style="display:block;width:26px;height:26px;border-radius:50% 50% 50% 0;background:hsl(178 42% 28%);transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)"></span>`,
@@ -23,10 +23,72 @@ const userIcon = L.divIcon({
   iconAnchor: [8, 8],
 });
 
+function clusterIcon(count) {
+  return L.divIcon({
+    className: "",
+    html: `<span style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:hsl(178 42% 28%);color:#fff;font-size:13px;font-weight:700;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)">${count}</span>`,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+  });
+}
+
+function clusterPoints(points, zoom) {
+  const step = 6 / Math.pow(2, zoom); // degrees; coarser when zoomed out
+  const groups = {};
+  for (const p of points) {
+    const key = `${Math.round(p.latitude / step)}_${Math.round(p.longitude / step)}`;
+    (groups[key] ||= []).push(p);
+  }
+  return Object.values(groups).map((g) => {
+    if (g.length === 1) return { type: "single", meeting: g[0] };
+    const lat = g.reduce((s, p) => s + p.latitude, 0) / g.length;
+    const lng = g.reduce((s, p) => s + p.longitude, 0) / g.length;
+    return { type: "cluster", count: g.length, meetings: g, lat, lng };
+  });
+}
+
+function MapContent({ points, userPos, selected, onSelect }) {
+  const map = useMap();
+  const [zoom, setZoom] = useState(map.getZoom());
+  useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
+  const clusters = useMemo(() => clusterPoints(points, zoom), [points, zoom]);
+
+  return (
+    <>
+      <TileLayer
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution="&copy; OpenStreetMap"
+      />
+      {userPos && <Marker position={userPos} icon={userIcon} />}
+      {clusters.map((c, i) =>
+        c.type === "single" ? (
+          <Marker
+            key={c.meeting.id}
+            position={[c.meeting.latitude, c.meeting.longitude]}
+            icon={pinIcon}
+            eventHandlers={{ click: () => onSelect(c.meeting) }}
+          />
+        ) : (
+          <Marker
+            key={`c${i}`}
+            position={[c.lat, c.lng]}
+            icon={clusterIcon(c.count)}
+            eventHandlers={{
+              click: () => {
+                map.setView([c.lat, c.lng], Math.min(map.getZoom() + 2, 16));
+              },
+            }}
+          />
+        )
+      )}
+    </>
+  );
+}
+
 function Recenter({ center }) {
   const map = useMap();
   useEffect(() => {
-    map.setView(center, 11);
+    if (center) map.setView(center, 11);
   }, [center, map]);
   return null;
 }
@@ -34,22 +96,20 @@ function Recenter({ center }) {
 export default function MapView() {
   const navigate = useNavigate();
   const { filters } = useFilters();
+  const { meetings, location } = useMeetings();
   const now = new Date();
   const [selected, setSelected] = useState(null);
 
   const points = useMemo(
     () =>
-      sortByNextOccurrence(
-        applyFilters(mockMeetings, filters, now).filter((m) => m.latitude && m.longitude),
-        now
-      ),
-    [filters]
+      prepareMeetings(meetings, filters, now).filter((m) => m.latitude && m.longitude),
+    [meetings, filters]
   );
 
-  // Center on first in-person meeting, else a default.
+  const userPos = location?.lat != null ? [location.lat, location.long] : null;
   const center = points[0]
     ? [points[0].latitude, points[0].longitude]
-    : [40.2669, -74.5213];
+    : userPos || [40.3573, -74.6672];
 
   return (
     <div className="relative h-screen w-full">
@@ -67,21 +127,13 @@ export default function MapView() {
       </div>
 
       <MapContainer center={center} zoom={11} className="h-full w-full" zoomControl={false}>
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; OpenStreetMap'
-        />
         <Recenter center={center} />
-        {/* current location dot */}
-        <Marker position={[40.2669, -74.5213]} icon={userIcon} />
-        {points.map((m) => (
-          <Marker
-            key={m.id}
-            position={[m.latitude, m.longitude]}
-            icon={pinIcon}
-            eventHandlers={{ click: () => setSelected(m) }}
-          />
-        ))}
+        <MapContent
+          points={points}
+          userPos={userPos}
+          selected={selected}
+          onSelect={setSelected}
+        />
       </MapContainer>
 
       {/* bottom sheet */}
@@ -96,13 +148,22 @@ export default function MapView() {
               </p>
               <p className="mt-0.5 inline-flex items-center gap-1.5 text-sm text-muted-foreground">
                 {selected.attendance_type === "Online" ? (
-                  <><Video className="h-3.5 w-3.5 text-accent" /> Online</>
+                  <>
+                    <Video className="h-3.5 w-3.5 text-accent" /> Online
+                  </>
                 ) : (
-                  <><Navigation className="h-3.5 w-3.5 text-accent" /> {selected.distance} mi away · {selected.attendance_type}</>
+                  <>
+                    <Navigation className="h-3.5 w-3.5 text-accent" />{" "}
+                    {selected.distance != null ? `${selected.distance} mi away · ` : ""}
+                    {selected.attendance_type}
+                  </>
                 )}
               </p>
             </div>
-            <button onClick={() => setSelected(null)} className="rounded-full p-1 text-muted-foreground active:bg-muted">
+            <button
+              onClick={() => setSelected(null)}
+              className="rounded-full p-1 text-muted-foreground active:bg-muted"
+            >
               <X className="h-5 w-5" />
             </button>
           </div>
