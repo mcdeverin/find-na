@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 const DAY_OPTIONS = ["Today", "Tomorrow", "Any Day", ...DAY_NAMES];
 const TIME_OPTIONS = ["Any Time", "Morning", "Afternoon", "Evening", "Late Night"];
 const ATTEND_OPTIONS = ["In-Person", "Online", "Hybrid"];
+const DISTANCE_OPTIONS = [5, 10, 25, 50, "Any"];
 
 export default function Meetings() {
   const navigate = useNavigate();
@@ -105,10 +106,17 @@ export default function Meetings() {
           onChange={(v) => setFilters({ ...filters, timeOfDay: v })}
         />
         <MultiFilterDropdown
-          allLabel="Attendance"
+          allLabel="Any"
+          triggerLabel="Attendance"
           options={ATTEND_OPTIONS}
           selected={filters.attendance}
           onChange={(arr) => setFilters({ ...filters, attendance: arr })}
+        />
+        <FilterDropdown
+          label={filters.distance === "Any" ? "Any Distance" : `${filters.distance} mi`}
+          options={{ list: DISTANCE_OPTIONS, default: 25 }}
+          value={filters.distance}
+          onChange={(v) => setFilters({ ...filters, distance: v })}
         />
         <button
           onClick={() => navigate("/filters")}

@@ -9,13 +9,14 @@ import { cn } from "@/lib/utils";
 
 export default function MultiFilterDropdown({
   allLabel = "Any",
+  triggerLabel,
   options,
   selected,
   onChange,
 }) {
   const summary =
     !selected || selected.length === 0
-      ? allLabel
+      ? (triggerLabel || allLabel)
       : selected.length <= 2
       ? selected.join(", ")
       : `${selected.length} selected`;
