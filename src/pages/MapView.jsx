@@ -169,7 +169,7 @@ export default function MapView() {
                 ) : (
                   <>
                     <Navigation className="h-3.5 w-3.5 text-accent" />{" "}
-                    {selected.distance != null ? `${selected.distance} mi away · ` : ""}
+                    {selected.distance != null ? `${selected.distance.toFixed(1)} mi away · ` : ""}
                     {selected.attendance_type}
                   </>
                 )}
