@@ -6,7 +6,7 @@ import MultiFilterDropdown from "@/components/MultiFilterDropdown";
 import MeetingRow from "@/components/MeetingRow";
 import { useFilters, defaultFilters } from "@/lib/filtersContext";
 import { useMeetings } from "@/lib/MeetingsContext";
-import { DAY_NAMES, prepareMeetings } from "@/lib/meetings";
+import { DAY_NAMES, prepareMeetingOccurrences } from "@/lib/meetings";
 import { cn } from "@/lib/utils";
 
 const DAY_OPTIONS = ["Today", "Tomorrow", "Any Day", ...DAY_NAMES];
@@ -21,10 +21,15 @@ export default function Meetings() {
   const [locText, setLocText] = useState("");
   const now = new Date();
 
-  const filtered = useMemo(
-    () => prepareMeetings(meetings, filters, now),
+  // For the Today view this includes meetings that already started earlier
+  // today; they're grouped separately below instead of being hidden.
+  const occurrences = useMemo(
+    () => prepareMeetingOccurrences(meetings, filters, now),
     [meetings, filters]
   );
+  const upcoming = occurrences.filter((o) => !o.isPast);
+  const earlier = occurrences.filter((o) => o.isPast);
+  const grouped = filters.day === "Today" && earlier.length > 0;
 
   const submitLocation = (e) => {
     e.preventDefault();
@@ -114,6 +119,19 @@ export default function Meetings() {
         </button>
       </div>
 
+      {/* Dev-only diagnostics: shows whether the BMLT fetch or the client-side
+          filtering is responsible for an empty list. */}
+      {import.meta.env.DEV && (status === "success" || status === "error") && (
+        <div className="border-t border-dashed border-border bg-muted/40 px-5 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+          <div>BMLT returned: {meetings.length} meetings</div>
+          <div>
+            Displayed after filters: {occurrences.length} meetings
+            {filters.day === "Today" &&
+              ` (${upcoming.length} upcoming, ${earlier.length} earlier today)`}
+          </div>
+        </div>
+      )}
+
       {/* Body */}
       <div className="border-t border-border">
         {status === "denied" && (
@@ -121,16 +139,55 @@ export default function Meetings() {
         )}
         {showSkeleton && <SkeletonList />}
         {status === "error" && <ErrorState message={error} onRetry={refresh} />}
-        {status === "success" && filtered.length === 0 && (
+        {status === "success" && occurrences.length === 0 && (
           <EmptyState
             expandTarget={expandTarget}
             onExpand={() => setFilters({ ...filters, distance: expandTarget })}
             onClear={() => setFilters(defaultFilters)}
           />
         )}
-        {status === "success" &&
-          filtered.map((m) => <MeetingRow key={m.id} meeting={m} />)}
+
+        {status === "success" && !grouped &&
+          occurrences.map((o) => (
+            <MeetingRow key={o.meeting.id} meeting={o.meeting} occurrence={o.occ} isPast={o.isPast} />
+          ))}
+
+        {status === "success" && grouped && (
+          <>
+            {upcoming.length > 0 && (
+              <>
+                <SectionLabel>Up Next</SectionLabel>
+                <div className="border-l-[3px] border-accent bg-accent/5">
+                  <MeetingRow
+                    meeting={upcoming[0].meeting}
+                    occurrence={upcoming[0].occ}
+                  />
+                </div>
+              </>
+            )}
+            {upcoming.length > 1 && (
+              <>
+                <SectionLabel>Later Today</SectionLabel>
+                {upcoming.slice(1).map((o) => (
+                  <MeetingRow key={o.meeting.id} meeting={o.meeting} occurrence={o.occ} />
+                ))}
+              </>
+            )}
+            <SectionLabel>Earlier Today</SectionLabel>
+            {earlier.map((o) => (
+              <MeetingRow key={o.meeting.id} meeting={o.meeting} occurrence={o.occ} isPast />
+            ))}
+          </>
+        )}
       </div>
+    </div>
+  );
+}
+
+function SectionLabel({ children }) {
+  return (
+    <div className="border-b border-border bg-secondary/40 px-5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      {children}
     </div>
   );
 }

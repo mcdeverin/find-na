@@ -1,11 +1,12 @@
 import { useNavigate } from "react-router-dom";
 import { ChevronRight, Video } from "lucide-react";
 import { formatTime, nextOccurrence, startsInLabel } from "@/lib/meetings";
+import { cn } from "@/lib/utils";
 
-export default function MeetingRow({ meeting, now = new Date() }) {
+export default function MeetingRow({ meeting, now = new Date(), occurrence = null, isPast = false }) {
   const navigate = useNavigate();
-  const occ = nextOccurrence(meeting, now);
-  const startsIn = startsInLabel(meeting, now);
+  const occ = occurrence || nextOccurrence(meeting, now);
+  const startsIn = isPast ? null : startsInLabel(meeting, now);
   const isVirtual = meeting.attendance_type === "Online";
   const isHybrid = meeting.attendance_type === "Hybrid";
 
@@ -14,7 +15,10 @@ export default function MeetingRow({ meeting, now = new Date() }) {
   return (
     <button
       onClick={() => navigate(`/meeting/${meeting.id}`)}
-      className="flex w-full items-stretch gap-3 border-b border-border px-5 py-3.5 text-left transition-colors active:bg-muted/60"
+      className={cn(
+        "flex w-full items-stretch gap-3 border-b border-border px-5 py-3.5 text-left transition-colors active:bg-muted/60",
+        isPast && "opacity-60"
+      )}
     >
       {/* time / distance block */}
       <div className="flex w-[68px] shrink-0 flex-col items-start">

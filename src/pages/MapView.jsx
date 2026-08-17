@@ -6,7 +6,12 @@ import "leaflet/dist/leaflet.css";
 import { List, Navigation, Video, X } from "lucide-react";
 import { useMeetings } from "@/lib/MeetingsContext";
 import { useFilters } from "@/lib/filtersContext";
-import { prepareMeetings, nextOccurrence, formatTime, relativeDayLabel } from "@/lib/meetings";
+import {
+  prepareMeetingOccurrences,
+  nextOccurrence,
+  formatTime,
+  relativeDayLabel,
+} from "@/lib/meetings";
 
 // Generic teal pin (NOT the NA logo).
 const pinIcon = L.divIcon({
@@ -100,11 +105,21 @@ export default function MapView() {
   const now = new Date();
   const [selected, setSelected] = useState(null);
 
-  const points = useMemo(
-    () =>
-      prepareMeetings(meetings, filters, now).filter((m) => m.latitude && m.longitude),
+  const prepared = useMemo(
+    () => prepareMeetingOccurrences(meetings, filters, now),
     [meetings, filters]
   );
+  const points = useMemo(
+    () => prepared.filter((o) => o.meeting.latitude && o.meeting.longitude).map((o) => o.meeting),
+    [prepared]
+  );
+  // Resolved occurrence per meeting, so an earlier-today meeting still reads
+  // "Today" in the sheet instead of jumping to next week's date.
+  const occById = useMemo(
+    () => new Map(prepared.map((o) => [o.meeting.id, o.occ])),
+    [prepared]
+  );
+  const selectedOcc = selected ? occById.get(selected.id) || nextOccurrence(selected, now) : null;
 
   const userPos = location?.lat != null ? [location.lat, location.long] : null;
   const center = points[0]
@@ -144,7 +159,7 @@ export default function MapView() {
             <div className="min-w-0">
               <h2 className="truncate text-[17px] font-semibold text-foreground">{selected.name}</h2>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                {relativeDayLabel(selected, now)} · {formatTime(nextOccurrence(selected, now))}
+                {relativeDayLabel(selected, now, selectedOcc)} · {formatTime(selectedOcc)}
               </p>
               <p className="mt-0.5 inline-flex items-center gap-1.5 text-sm text-muted-foreground">
                 {selected.attendance_type === "Online" ? (

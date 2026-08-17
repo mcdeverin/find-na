@@ -47,17 +47,25 @@ function zonedToUTC(year, month, day, hour, minute, tz) {
   return new Date(asUTC + offset);
 }
 
-// Next upcoming occurrence of a meeting (UTC Date), relative to `now`.
-export function nextOccurrence(meeting, now = new Date()) {
+// Occurrence of a meeting on its scheduled day inside the current week window
+// (UTC Date), WITHOUT skipping ahead when it has already happened. For a
+// meeting whose day_of_week is today, this returns today's occurrence even if
+// that time is already in the past — which is what the "Today" view needs in
+// order to show the full day's schedule the way Meeting Guide does.
+export function currentWeekOccurrence(meeting, now = new Date()) {
   const tz = meeting.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   if (meeting.day_of_week == null) return new Date(NaN);
   const cur = getZonedParts(now, tz);
   const { h, m } = parseTimeToParts(meeting.start_time);
-  let diff = (meeting.day_of_week - cur.weekday + 7) % 7;
-  let occ = zonedToUTC(cur.year, cur.month, cur.day + diff, h, m, tz);
-  if (occ <= now) {
-    occ = new Date(occ.getTime() + 7 * 86400000);
-  }
+  const diff = (meeting.day_of_week - cur.weekday + 7) % 7;
+  return zonedToUTC(cur.year, cur.month, cur.day + diff, h, m, tz);
+}
+
+// Next upcoming occurrence of a meeting (UTC Date), relative to `now`.
+export function nextOccurrence(meeting, now = new Date()) {
+  const occ = currentWeekOccurrence(meeting, now);
+  if (isNaN(occ)) return occ;
+  if (occ <= now) return new Date(occ.getTime() + 7 * 86400000);
   return occ;
 }
 
@@ -106,8 +114,8 @@ function addDays(d, n) {
   return x;
 }
 
-export function relativeDayLabel(meeting, now = new Date()) {
-  const occ = nextOccurrence(meeting, now);
+export function relativeDayLabel(meeting, now = new Date(), occurrence = null) {
+  const occ = occurrence || nextOccurrence(meeting, now);
   const today = startOfDay(now);
   const occDay = startOfDay(occ);
   const dayDiff = Math.round((occDay - today) / 86400000);
@@ -131,16 +139,29 @@ export function lastConfirmedLabel(meeting, now = new Date()) {
 
 export const TIME_OF_DAY = ["Morning", "Afternoon", "Evening", "Late Night"];
 
-// Filter the fetched BMLT meetings for the active view and sort by upcoming
-// occurrence. Day/time/attendance/distance/formats are already applied
-// server-side; this handles the view-specific upcoming window plus the
-// remaining client-side filters (open/closed, wheelchair, language, late night).
-export function prepareMeetings(meetings, filters, now = new Date()) {
+// Filter the fetched BMLT meetings for the active view and sort chronologically.
+// Day/time/attendance/distance/formats are already applied server-side; this
+// handles the view-specific day window plus the remaining client-side filters
+// (open/closed, wheelchair, language, late night).
+//
+// The "Today" view intentionally keeps meetings that have already started
+// earlier today — like Meeting Guide, the whole day's schedule stays visible
+// and callers separate "up next" from "earlier today" (see `isPast`). Every
+// other view stays upcoming-only.
+//
+// Returns [{ meeting, occ, isPast }] sorted by occurrence, earliest first.
+export function prepareMeetingOccurrences(meetings, filters, now = new Date()) {
+  const showWholeDay = filters.day === "Today";
   const withOcc = [];
   for (const m of meetings) {
     if (m.day_of_week == null) continue;
-    const occ = nextOccurrence(m, now);
-    if (!(occ > now)) continue; // upcoming only
+    // For the Today view use the un-advanced occurrence so a meeting that
+    // already happened today isn't pushed to next week (and then dropped by
+    // the same-day check below).
+    const occ = showWholeDay ? currentWeekOccurrence(m, now) : nextOccurrence(m, now);
+    if (isNaN(occ)) continue;
+    const isPast = !(occ > now);
+    if (isPast && !showWholeDay) continue;
     if (filters.day === "Today" && !isSameDay(occ, now)) continue;
     if (filters.day === "Tomorrow" && !isSameDay(occ, addDays(now, 1))) continue;
     if (DAY_NAMES.includes(filters.day) && occ.getDay() !== DAY_NAMES.indexOf(filters.day)) continue;
@@ -151,8 +172,14 @@ export function prepareMeetings(meetings, filters, now = new Date()) {
       const h = occ.getHours();
       if (!(h >= 21 || h < 5)) continue;
     }
-    withOcc.push({ m, occ });
+    withOcc.push({ meeting: m, occ, isPast });
   }
   withOcc.sort((a, b) => a.occ - b.occ);
-  return withOcc.map((x) => x.m);
+  return withOcc;
+}
+
+// Same filtering, flattened to plain meetings for callers that don't need the
+// resolved occurrence.
+export function prepareMeetings(meetings, filters, now = new Date()) {
+  return prepareMeetingOccurrences(meetings, filters, now).map((x) => x.meeting);
 }
